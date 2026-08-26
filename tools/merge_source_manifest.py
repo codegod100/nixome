@@ -4,10 +4,20 @@ from pathlib import Path
 
 p = argparse.ArgumentParser()
 p.add_argument("--source", nargs=2, action="append", default=[])
+p.add_argument("--group", action="append", default=[])
 p.add_argument("--output", required=True)
 args = p.parse_args()
 sources = {}
-for source_id, directory in sorted(args.source):
+
+entries = list(args.source)
+for group in args.group:
+    entries.extend(
+        (child.name, str(child))
+        for child in Path(group).iterdir()
+        if child.is_dir() and (child / "source.json").is_file()
+    )
+
+for source_id, directory in sorted(entries):
     metadata = json.loads((Path(directory) / "source.json").read_text())
     previous = sources.get(source_id)
     if previous is not None and previous != metadata:

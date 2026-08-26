@@ -14,13 +14,14 @@ class GraphError(Exception):
 class Dependency:
     reference: ElementRef
     scope: str
+    config: tuple[tuple[str, Any], ...] = ()
 
 
 def _dependencies(
     raw: Any, owner: ElementRef, default_scope: str
-) -> list[tuple[str, str]]:
+) -> list[tuple[str, str, dict[str, Any]]]:
     if isinstance(raw, str):
-        return [(raw, default_scope)]
+        return [(raw, default_scope, {})]
     if not isinstance(raw, dict):
         raise GraphError(f"{owner.qualified()}: malformed dependency {raw!r}")
     filenames = raw.get("filename")
@@ -35,7 +36,10 @@ def _dependencies(
         raise GraphError(
             f"{owner.qualified()}: unsupported dependency type {scope!r}"
         )
-    return [(filename, scope) for filename in filenames]
+    config = raw.get("config", {})
+    if not isinstance(config, dict):
+        raise GraphError(f"{owner.qualified()}: malformed dependency config {config!r}")
+    return [(filename, scope, config) for filename in filenames]
 
 
 def lock_graph(
@@ -78,14 +82,20 @@ def lock_graph(
             if not isinstance(values, list):
                 raise GraphError(f"{qualified}: {group} must compose to a list")
             for raw in values:
-                for dependency_name, scope in _dependencies(
+                for dependency_name, scope, config in _dependencies(
                     raw, reference, default_scope
                 ):
                     try:
                         dependency_ref = resolver.resolve(project, dependency_name)
                     except JunctionError as error:
                         raise GraphError(f"{qualified}: {error}") from error
-                    dependencies.append(Dependency(dependency_ref, scope))
+                    dependencies.append(
+                        Dependency(
+                            dependency_ref,
+                            scope,
+                            tuple(sorted(config.items())),
+                        )
+                    )
                     visit(dependency_ref)
 
         sources = document.get("sources", [])
@@ -112,6 +122,21 @@ def lock_graph(
             "element": reference.element,
             "kind": str(document.get("kind", "<missing>")),
             "dependencies": by_scope,
+            "dependencyDetails": [
+                {
+                    "element": dependency.reference.qualified(),
+                    "scope": dependency.scope,
+                    "config": dict(dependency.config),
+                }
+                for dependency in sorted(
+                    dependencies,
+                    key=lambda item: (
+                        item.reference.qualified(),
+                        item.scope,
+                        repr(item.config),
+                    ),
+                )
+            ],
             "sources": normalized_sources,
             "variables": document.get("variables", {}),
             "config": document.get("config", {}),

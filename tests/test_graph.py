@@ -65,6 +65,18 @@ depends:
         "run": ["gnome:glib.bst"],
         "all": [],
     }
+    assert image["dependencyDetails"] == [
+        {
+            "element": "gnome:glib.bst",
+            "scope": "run",
+            "config": {},
+        },
+        {
+            "element": "sdk:components/compiler.bst",
+            "scope": "build",
+            "config": {"location": "/toolchain"},
+        },
+    ]
     assert sorted(graph["elements"]) == [
         "gnome:glib.bst",
         "gnome:image.bst",

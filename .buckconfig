@@ -1,5 +1,6 @@
 [cells]
 root = .
+generated_sources = generated/sources
 
 [buildfile]
 name_v2 = BUCK

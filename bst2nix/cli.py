@@ -6,8 +6,11 @@ import sys
 from pathlib import Path
 
 from .graph import GraphError
+from .build_plan import BuildPlanError
 from .junction import JunctionError
+from .oci import OciError
 from .source_lock import SourceLockError
+from .staging import StagingError
 from .translator import TranslationError, translate
 
 
@@ -67,13 +70,69 @@ def parser() -> argparse.ArgumentParser:
     )
     generated.add_argument("source_lock", type=Path)
     generated.add_argument("-o", "--output", type=Path, required=True)
+    oci = commands.add_parser(
+        "export-oci", help="export a root filesystem as a deterministic OCI layout"
+    )
+    oci.add_argument("rootfs", type=Path)
+    oci.add_argument("-o", "--output", type=Path, required=True)
+    oci.add_argument("--architecture", choices=["amd64", "arm64"], default="amd64")
+    oci.add_argument("--reference", default="gnomeos:latest")
+    oci.add_argument("--label", action="append", default=[], metavar="NAME=VALUE")
+    stage = commands.add_parser(
+        "stage-sources", help="stage an element's locked, materialized sources"
+    )
+    stage.add_argument("source_lock", type=Path)
+    stage.add_argument("element")
+    stage.add_argument("--materialized", type=Path, action="append", required=True)
+    stage.add_argument("-o", "--output", type=Path, required=True)
+    plan = commands.add_parser(
+        "build-plan", help="emit the native execution plan for a locked element"
+    )
+    plan.add_argument("graph", type=Path)
+    plan.add_argument("element")
+    plan.add_argument("-o", "--output", type=Path)
     return result
 
 
 def main() -> None:
     args = parser().parse_args()
     try:
-        if args.command == "generate-buck-sources":
+        if args.command == "build-plan":
+            from .build_plan import element_build_plan
+
+            graph = element_build_plan(
+                json.loads(args.graph.read_text(encoding="utf-8")), args.element
+            )
+        elif args.command == "stage-sources":
+            from .staging import stage_element_sources
+
+            stage_element_sources(
+                json.loads(args.source_lock.read_text(encoding="utf-8")),
+                args.element,
+                args.materialized,
+                args.output,
+            )
+            return
+        elif args.command == "export-oci":
+            from .oci import export_oci
+
+            labels = {}
+            for assignment in args.label:
+                if "=" not in assignment:
+                    raise OciError("--label requires NAME=VALUE")
+                key, value = assignment.split("=", 1)
+                if not key:
+                    raise OciError("--label requires NAME=VALUE")
+                labels[key] = value
+            export_oci(
+                args.rootfs,
+                args.output,
+                architecture=args.architecture,
+                reference=args.reference,
+                labels=labels,
+            )
+            return
+        elif args.command == "generate-buck-sources":
             from .buck_generator import generate_buck_sources
 
             rendered = generate_buck_sources(
@@ -152,6 +211,9 @@ def main() -> None:
         GraphError,
         JunctionError,
         SourceLockError,
+        OciError,
+        StagingError,
+        BuildPlanError,
     ) as error:
         print(f"bst2nix: {error}", file=sys.stderr)
         raise SystemExit(2) from error

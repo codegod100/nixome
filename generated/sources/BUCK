@@ -1,0 +1,22 @@
+# Bootstrap fixture generated with the same labels and rules as the complete
+# source cell. `bst2nix generate-buck-sources` replaces this with all locked
+# Git sources.
+load("@root//buck2:git_acquire.bzl", "git_repo_acquire")
+load("@root//buck2:source_manifest.bzl", "source_manifest")
+
+git_repo_acquire(
+    name = "git-repo-gnome-build-meta",
+    sources = {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "cf996738158c1a3291a8c98df88892b26d335bc2",
+    },
+    tool = "root//tools:acquire_git",
+    url = "https://gitlab.gnome.org/GNOME/gnome-build-meta.git",
+    visibility = ["PUBLIC"],
+)
+
+source_manifest(
+    name = "manifest",
+    groups = [":git-repo-gnome-build-meta"],
+    tool = "root//tools:merge_source_manifest",
+    visibility = ["PUBLIC"],
+)
