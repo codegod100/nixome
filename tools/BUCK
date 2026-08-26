@@ -7,7 +7,20 @@ python_tool(
 )
 
 python_tool(
+    name = "acquire_http",
+    src = "acquire_http.py",
+    visibility = ["PUBLIC"],
+)
+
+python_tool(
     name = "merge_source_manifest",
     src = "merge_source_manifest.py",
+    visibility = ["PUBLIC"],
+)
+
+python_tool(
+    name = "build_element",
+    src = "build_element.py",
+    srcs = ["//bst2nix:library"],
     visibility = ["PUBLIC"],
 )

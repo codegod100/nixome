@@ -61,7 +61,7 @@ def stage_element_sources(
         source = sources.get(source_id)
         if not isinstance(source, dict):
             raise StagingError(f"missing lock entry for source {source_id}")
-        if source.get("fetcher") != "git":
+        if source.get("fetcher") not in {"git", "tar", "zip", "remote", "archive"}:
             raise StagingError(
                 f"source {source_id} uses unsupported staging fetcher "
                 f"{source.get('fetcher')!r}"

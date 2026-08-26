@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .graph import GraphError
 from .build_plan import BuildPlanError
+from .executor import ExecutionError
 from .junction import JunctionError
 from .oci import OciError
 from .source_lock import SourceLockError
@@ -91,13 +92,55 @@ def parser() -> argparse.ArgumentParser:
     plan.add_argument("graph", type=Path)
     plan.add_argument("element")
     plan.add_argument("-o", "--output", type=Path)
+    execute = commands.add_parser(
+        "execute-plan", help="execute a native element plan without BuildStream"
+    )
+    execute.add_argument("plan", type=Path)
+    execute.add_argument("--source", type=Path, required=True)
+    execute.add_argument(
+        "--dependency", action="append", default=[], metavar="ELEMENT=ARTIFACT"
+    )
+    execute.add_argument("-o", "--output", type=Path, required=True)
+    generated_elements = commands.add_parser(
+        "generate-buck-elements",
+        help="generate the executable native element DAG",
+    )
+    generated_elements.add_argument("graph", type=Path)
+    generated_elements.add_argument("source_lock", type=Path)
+    generated_elements.add_argument("-o", "--output", type=Path, required=True)
     return result
 
 
 def main() -> None:
     args = parser().parse_args()
     try:
-        if args.command == "build-plan":
+        if args.command == "generate-buck-elements":
+            from .element_generator import generate_buck_elements
+
+            rendered = generate_buck_elements(
+                json.loads(args.graph.read_text(encoding="utf-8")),
+                json.loads(args.source_lock.read_text(encoding="utf-8")),
+            )
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+            return
+        elif args.command == "execute-plan":
+            from .executor import execute_plan
+
+            dependencies = {}
+            for assignment in args.dependency:
+                if "=" not in assignment:
+                    raise ExecutionError("--dependency requires ELEMENT=ARTIFACT")
+                name, path = assignment.split("=", 1)
+                dependencies[name] = Path(path)
+            execute_plan(
+                json.loads(args.plan.read_text(encoding="utf-8")),
+                args.source,
+                dependencies,
+                args.output,
+            )
+            return
+        elif args.command == "build-plan":
             from .build_plan import element_build_plan
 
             graph = element_build_plan(
@@ -214,6 +257,7 @@ def main() -> None:
         OciError,
         StagingError,
         BuildPlanError,
+        ExecutionError,
     ) as error:
         print(f"bst2nix: {error}", file=sys.stderr)
         raise SystemExit(2) from error
