@@ -141,6 +141,7 @@ def lock_graph(
             "sources": normalized_sources,
             "variables": document.get("variables", {}),
             "config": document.get("config", {}),
+            "public": document.get("public", {}),
         }
         visiting.pop()
 

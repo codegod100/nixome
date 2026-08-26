@@ -93,6 +93,25 @@ def main():
                 git_crate(crate, destination)
             else:
                 raise SystemExit(f"unsupported Cargo source kind: {crate['kind']}")
+        cargo_config = root / ".cargo" / "config.toml"
+        cargo_config.parent.mkdir()
+        relative_vendor = vendor.as_posix()
+        mappings = [
+            "[source.crates-io]",
+            'replace-with = "bst2nix-vendored"',
+            "",
+            "[source.bst2nix-vendored]",
+            f'directory = "{relative_vendor}"',
+        ]
+        for repository in sorted({
+            crate["repo"] for crate in spec["crates"] if crate["kind"] == "git"
+        }):
+            mappings.extend([
+                "",
+                f'[source."git+{repository}"]',
+                'replace-with = "bst2nix-vendored"',
+            ])
+        cargo_config.write_text("\n".join(mappings) + "\n")
         deterministic_tar(root, args.output / "source.tar")
 
 
