@@ -49,7 +49,14 @@ def main():
                 )
                 with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as source:
                     for member in source.getmembers():
-                        member.name = str(PurePosixPath(member.name).relative_to(relative))
+                        try:
+                            member.name = str(
+                                PurePosixPath(member.name).relative_to(relative)
+                            )
+                        except ValueError:
+                            # git archive includes parent directory entries
+                            # before the requested subtree.
+                            continue
                         if member.name == ".":
                             continue
                         member.uid = member.gid = 0

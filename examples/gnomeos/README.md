@@ -56,6 +56,20 @@ $ nix build .#gnomeos-source-lock
 $ buck2 build //:gnomeos-source-lock --show-output
 ```
 
+## Build the native OCI target
+
+Generate Buck2 source and element cells from the pinned locks, then build the
+public target:
+
+```console
+$ tools/generate_gnomeos_cells.sh
+$ buck2 build //:gnomeos-oci --show-output
+```
+
+The `gnomeos-oci` target resolves to the translated
+`gnome:oci/gnomeos/image.bst` graph. Element actions execute directly with
+`bst2nix`; BuildStream is not invoked.
+
 The resulting `source-lock.json` resolves project URL aliases, extracts commits
 from Git-describe refs, validates existing SHA-256 content refs, validates local
 paths, and assigns each unique normalized source a stable content-derived ID.

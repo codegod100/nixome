@@ -40,3 +40,35 @@ def test_generates_dependency_ordered_element_targets():
     assert "# Executable elements: 2; blocked elements: 0" in result
     assert result.count("element_execute(") == 2
     assert 'name = "target"' in result
+
+
+def test_renders_starlark_boolean_source_attributes():
+    graph = {
+        "target": "p:source.bst",
+        "elements": {
+            "p:source.bst": {
+                "kind": "manual",
+                "config": {},
+                "variables": {},
+                "dependencies": {"all": [], "build": [], "run": []},
+            }
+        },
+    }
+    source_lock = {
+        "elements": {"p:source.bst": ["source"]},
+        "sources": {
+            "source": {
+                "fetcher": "git",
+                "url": "https://example.test/source.git",
+                "revision": "abc",
+                "submodules": False,
+                "directory": 4.4,
+            }
+        },
+    }
+
+    result = generate_buck_elements(graph, source_lock)
+
+    assert '"submodules": False' in result
+    assert '"submodules": false' not in result
+    assert '"directory": "4.4"' in result

@@ -1,10 +1,11 @@
 def _python_tool_impl(ctx):
     args = cmd_args(
         "nix", "--extra-experimental-features", "nix-command flakes",
-        "shell", "nixpkgs#python3", "--command", "python3", ctx.attrs.src,
+        "shell", "nixpkgs#python3", "--command",
+        "env", "PYTHONPATH=.", "python3", ctx.attrs.src,
     )
     for dependency in ctx.attrs.srcs:
-        args.hidden(dependency[DefaultInfo].default_outputs)
+        args.add(cmd_args(hidden = dependency[DefaultInfo].default_outputs))
     return [
         DefaultInfo(),
         RunInfo(args = args),

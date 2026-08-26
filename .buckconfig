@@ -1,6 +1,7 @@
 [cells]
 root = .
 generated_sources = generated/sources
+generated_elements = generated/elements
 
 [buildfile]
 name_v2 = BUCK

@@ -1,6 +1,7 @@
 load("//buck2:git_acquire.bzl", "git_acquire")
 load("//buck2:nix_build.bzl", "nix_build")
 load("//buck2:source_set.bzl", "source_set")
+load("//buck2:artifact_alias.bzl", "artifact_alias")
 
 PROJECT_SRCS = glob(
     ["**"],
@@ -47,4 +48,11 @@ nix_build(
     name = "gnomeos-source-lock",
     flake = ".#gnomeos-source-lock",
     srcs = PROJECT_SRCS,
+)
+
+artifact_alias(
+    name = "gnomeos-oci",
+    # sha256("gnome:oci/gnomeos/image.bst"); generated element targets are
+    # content-addressed and public.
+    actual = "generated_elements//:element-268abdd057348d94937d622d4e47d9a2f08d3c68354d77851f810c737a8e9dd3",
 )
