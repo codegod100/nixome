@@ -1,0 +1,13 @@
+load(":defs.bzl", "python_tool")
+
+python_tool(
+    name = "acquire_git",
+    src = "acquire_git.py",
+    visibility = ["PUBLIC"],
+)
+
+python_tool(
+    name = "merge_source_manifest",
+    src = "merge_source_manifest.py",
+    visibility = ["PUBLIC"],
+)

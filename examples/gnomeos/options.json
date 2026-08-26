@@ -1,0 +1,8 @@
+{
+  "arch": "x86_64",
+  "channel": "nightly",
+  "recc": "remote-execution",
+  "recc_optimisations": false,
+  "toolbox": false,
+  "x86_64_v3": false
+}

@@ -31,6 +31,15 @@ The generated `graph.json` is an inspectable, deterministic intermediate
 representation. `nix/build-project.nix` turns that graph into one derivation per
 element.
 
+Audit the pinned, real GNOME OS OCI BuildStream target with:
+
+```console
+$ nix run .#gnomeos-audit
+```
+
+This inventories the upstream graph and reports the compatibility work still
+required without invoking `bst`. See `examples/gnomeos/README.md`.
+
 Run the translator tests with:
 
 ```console

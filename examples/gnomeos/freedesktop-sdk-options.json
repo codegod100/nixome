@@ -1,0 +1,5 @@
+{
+  "bootstrap_build_arch": "x86_64",
+  "target_arch": "x86_64",
+  "x86_64_v3": false
+}
