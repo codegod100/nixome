@@ -1,5 +1,6 @@
 load("//buck2:git_acquire.bzl", "git_acquire")
 load("//buck2:nix_build.bzl", "nix_build")
+load("//buck2:source_set.bzl", "source_set")
 
 PROJECT_SRCS = glob(
     ["**"],
@@ -9,6 +10,12 @@ PROJECT_SRCS = glob(
         "result",
         "result-*",
     ],
+)
+
+source_set(
+    name = "bst2nix_sources",
+    srcs = glob(["bst2nix/*.py"]),
+    visibility = ["PUBLIC"],
 )
 
 git_acquire(

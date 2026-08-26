@@ -36,3 +36,24 @@ def test_preserves_script_commands_and_dependency_locations():
         ],
         "compose": {},
     }
+
+
+def test_creates_import_plan():
+    graph = {
+        "elements": {
+            "p:config.bst": {
+                "kind": "import",
+                "config": {"source": "/", "target": "%{sysconfdir}/example"},
+                "variables": {},
+                "dependencies": {"all": [], "build": [], "run": []},
+            }
+        }
+    }
+
+    plan = element_build_plan(graph, "p:config.bst")
+
+    assert plan["commands"] == []
+    assert plan["import"] == {
+        "source": "/",
+        "target": "%{sysconfdir}/example",
+    }

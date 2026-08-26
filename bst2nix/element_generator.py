@@ -25,6 +25,14 @@ def _source_group(source: dict[str, Any]) -> str:
 def _source_target(source_id: str, source: dict[str, Any]) -> str:
     if source["fetcher"] == "git":
         return _source_group(source)
+    if source["fetcher"] in {"local", "patch", "patch_queue"}:
+        return "project-" + source_id
+    if source["fetcher"] == "embedded":
+        return "embedded-" + source_id
+    if source["fetcher"] == "cargo":
+        return "cargo-" + source_id
+    if source["fetcher"] == "oci":
+        return "oci-" + source_id
     return "http-" + source_id
 
 
@@ -43,7 +51,13 @@ def generate_buck_elements(
             source_ids = declarations.get(name, [])
             if any(
                 sources.get(source_id, {}).get("fetcher")
-                not in {"git", "tar", "zip", "remote", "archive"}
+                not in {
+                    "git", "tar", "zip", "remote", "archive",
+                    "local", "patch", "patch_queue",
+                    "embedded",
+                    "cargo",
+                    "oci",
+                }
                 for source_id in source_ids
             ):
                 continue

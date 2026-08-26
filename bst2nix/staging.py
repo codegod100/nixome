@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import shutil
+import subprocess
 import tarfile
+import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -61,7 +63,14 @@ def stage_element_sources(
         source = sources.get(source_id)
         if not isinstance(source, dict):
             raise StagingError(f"missing lock entry for source {source_id}")
-        if source.get("fetcher") not in {"git", "tar", "zip", "remote", "archive"}:
+        fetcher = source.get("fetcher")
+        if fetcher not in {
+            "git", "tar", "zip", "remote", "archive",
+            "local", "patch", "patch_queue",
+            "embedded",
+            "cargo",
+            "oci",
+        }:
             raise StagingError(
                 f"source {source_id} uses unsupported staging fetcher "
                 f"{source.get('fetcher')!r}"
@@ -69,8 +78,48 @@ def stage_element_sources(
         archive_path = materialized.get(source_id)
         if archive_path is None:
             raise StagingError(f"source {source_id} has not been materialized")
+        if fetcher in {"patch", "patch_queue"}:
+            with tempfile.TemporaryDirectory() as temporary:
+                patch_root = Path(temporary)
+                with tarfile.open(archive_path, "r") as archive:
+                    archive.extractall(
+                        patch_root,
+                        members=_safe_members(archive, source_id),
+                        filter="data",
+                    )
+                patches = sorted(path for path in patch_root.rglob("*") if path.is_file())
+                series = next(
+                    (path for path in patches if path.name == "series"), None
+                )
+                if series:
+                    by_name = {path.relative_to(patch_root).as_posix(): path for path in patches}
+                    patches = [
+                        by_name[line.split()[0]]
+                        for line in series.read_text().splitlines()
+                        if line.strip() and not line.lstrip().startswith("#")
+                    ]
+                for patch in patches:
+                    if patch.name == "series":
+                        continue
+                    subprocess.run(
+                        [
+                            "patch",
+                            f"-p{int(source.get('stripLevel', 1))}",
+                            "--forward",
+                            "--batch",
+                            "-i",
+                            str(patch),
+                        ],
+                        cwd=output,
+                        check=True,
+                    )
+            continue
         destination = _destination(
-            output, source.get("directory", source.get("path")), source_id
+            output,
+            source.get("directory")
+            if fetcher == "local"
+            else source.get("directory", source.get("path")),
+            source_id,
         )
         destination.mkdir(parents=True, exist_ok=True)
         with tarfile.open(archive_path, "r") as archive:

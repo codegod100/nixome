@@ -57,6 +57,10 @@ depends:
         resolver,
         "image.bst",
         project_revisions={"gnome": "gnome-rev", "sdk": "sdk-rev"},
+        project_urls={
+            "gnome": "https://example/gnome.git",
+            "sdk": "https://example/sdk.git",
+        },
     )
 
     image = graph["elements"]["gnome:image.bst"]
@@ -83,3 +87,4 @@ depends:
         "sdk:components/compiler.bst",
     ]
     assert graph["projects"]["sdk"]["revision"] == "sdk-rev"
+    assert graph["projects"]["sdk"]["url"] == "https://example/sdk.git"

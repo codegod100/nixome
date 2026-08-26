@@ -87,6 +87,12 @@ def execute_plan(
                 runtime.append(artifact)
 
         variables = {
+            "bindir": "/usr/bin",
+            "datadir": "/usr/share",
+            "indep-libdir": "/usr/lib",
+            "libdir": "/usr/lib",
+            "prefix": "/usr",
+            "sysconfdir": "/etc",
             **{key: str(value) for key, value in plan.get("variables", {}).items()},
             "build-root": str(build_root),
             "install-root": str(output),
@@ -104,6 +110,22 @@ def execute_plan(
             "BST2NIX_INSTALL_ROOT": str(output),
             "BST2NIX_SYSROOT": str(sysroot),
         }
+        if plan.get("kind") == "import":
+            import_config = plan["import"]
+            source_name = _expand(import_config["source"], variables, element)
+            target_name = _expand(import_config["target"], variables, element)
+            source_path = _location(build_root, source_name)
+            target_path = _location(output, target_name)
+            if source_path.is_dir():
+                _merge(source_path, target_path)
+            elif source_path.is_file():
+                target_path.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, target_path / source_path.name)
+            else:
+                raise ExecutionError(
+                    f"{element}: import source does not exist: {source_name}"
+                )
+
         for entry in plan.get("commands", []):
             command = _expand(entry["command"], variables, element)
             for name in location_names:
@@ -119,7 +141,7 @@ def execute_plan(
                     f"with exit code {result.returncode}"
                 )
 
-        if not plan.get("commands"):
+        if not plan.get("commands") and plan.get("kind") != "import":
             for dependency in plan.get("dependencies", []):
                 if dependency.get("scope") in {"run", "all"}:
                     _merge(dependencies[dependency["element"]], output)

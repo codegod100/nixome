@@ -139,12 +139,25 @@ def normalize_source(
                 _sha256(crate.get("sha"), f"{label} crate")
             elif crate.get("kind") == "git":
                 _git_commit(crate.get("commit"), f"{label} crate")
-        return {"fetcher": "cargo", "crates": refs}
+                crate["repo"] = resolve_url(crate["repo"], aliases)
+        return {
+            "fetcher": "cargo",
+            "crates": refs,
+            "vendorDir": source.get("vendor-dir", ".vendored-crates"),
+            "cargoLock": source.get("cargo-lock", "Cargo.lock"),
+            **common,
+        }
     if kind == "gen_cargo_lock":
         ref = source.get("ref")
         if not isinstance(ref, str):
             raise SourceLockError(f"{label} has no embedded lock")
-        return {"fetcher": "embedded", "encoding": "base64", "data": ref}
+        return {
+            "fetcher": "embedded",
+            "encoding": "base64",
+            "data": ref,
+            "filename": source.get("filename", "Cargo.lock"),
+            **common,
+        }
     raise SourceLockError(f"unsupported source kind: {kind!r}")
 
 
@@ -171,6 +184,7 @@ def lock_sources(
     return {
         "formatVersion": 1,
         "graphTarget": graph["target"],
+        "projects": graph.get("projects", {}),
         "sources": dict(sorted(unique.items())),
         "elements": declarations,
         "declarationCount": sum(len(ids) for ids in declarations.values()),

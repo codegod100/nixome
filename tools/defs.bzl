@@ -3,7 +3,8 @@ def _python_tool_impl(ctx):
         "nix", "--extra-experimental-features", "nix-command flakes",
         "shell", "nixpkgs#python3", "--command", "python3", ctx.attrs.src,
     )
-    args.hidden(ctx.attrs.srcs)
+    for dependency in ctx.attrs.srcs:
+        args.hidden(dependency[DefaultInfo].default_outputs)
     return [
         DefaultInfo(),
         RunInfo(args = args),
@@ -13,6 +14,6 @@ python_tool = rule(
     impl = _python_tool_impl,
     attrs = {
         "src": attrs.source(),
-        "srcs": attrs.list(attrs.source(), default = []),
+        "srcs": attrs.list(attrs.dep(providers = [DefaultInfo]), default = []),
     },
 )

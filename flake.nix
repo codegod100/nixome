@@ -47,6 +47,8 @@
               --options ${./examples/gnomeos/options.json} \
               --revision gnome=cf996738158c1a3291a8c98df88892b26d335bc2 \
               --revision freedesktop-sdk=e076d4978ee6945763486f6ebd755d189460e4e7 \
+              --project-url gnome=https://gitlab.gnome.org/GNOME/gnome-build-meta.git \
+              --project-url freedesktop-sdk=https://gitlab.com/freedesktop-sdk/freedesktop-sdk.git \
               --junction freedesktop-sdk.bst=${freedesktop-sdk} \
               --junction-options \
                 freedesktop-sdk.bst=${./examples/gnomeos/freedesktop-sdk-options.json} \

@@ -47,6 +47,7 @@ def lock_graph(
     target: str,
     *,
     project_revisions: dict[str, str],
+    project_urls: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Walk a composed, junction-resolved graph into deterministic JSON data."""
 
@@ -147,15 +148,20 @@ def lock_graph(
     visit(root)
 
     projects = {}
+    project_urls = project_urls or {}
     project_names = {node["project"] for node in nodes.values()}
     for name in sorted(project_names):
         project = resolver.project(name)
         revision = project_revisions.get(name)
         if not revision:
             raise GraphError(f"missing immutable revision for project {name}")
+        repository = project_urls.get(name)
+        if project_urls and not repository:
+            raise GraphError(f"missing canonical repository URL for project {name}")
         projects[name] = {
             "revision": revision,
             "options": dict(sorted(project.options.items())),
+            **({"url": repository} if repository else {}),
         }
 
     return {

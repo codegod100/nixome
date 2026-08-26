@@ -6,7 +6,11 @@ def test_groups_git_sources_by_repository():
     result = generate_buck_sources(
         {
             "sources": {
-                archive_id: {"fetcher": "tar", "url": "https://example/a"},
+                archive_id: {
+                    "fetcher": "tar",
+                    "url": "https://example/a",
+                    "sha256": "f" * 64,
+                },
                 git_id: {
                     "fetcher": "git",
                     "url": "https://example/repo.git",
@@ -25,7 +29,8 @@ def test_groups_git_sources_by_repository():
     assert result.count("git_repo_acquire(") == 1
     assert f'"{git_id}": "{"c" * 40}"' in result
     assert f'"{second_git_id}": "{"e" * 40}"' in result
-    assert archive_id not in result
+    assert f'name = "http-{archive_id}"' in result
+    assert 'tool = "root//tools:acquire_http"' in result
     assert "submodules = True" in result
     assert "# Git sources: 2; repository actions: 1" in result
     assert 'name = "manifest"' in result

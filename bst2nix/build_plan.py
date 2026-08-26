@@ -27,7 +27,7 @@ def element_build_plan(graph: dict[str, Any], name: str) -> dict[str, Any]:
         command_groups = [("commands", config.get("commands", []))]
     elif kind in {"manual", "autotools", "meson", "cmake", "make"}:
         command_groups = [(key, config.get(key, [])) for key in _COMMAND_KEYS]
-    elif kind in {"compose", "filter", "stack", "junction"}:
+    elif kind in {"compose", "filter", "stack", "junction", "import"}:
         command_groups = []
     else:
         raise BuildPlanError(f"{name}: unsupported element kind {kind!r}")
@@ -79,4 +79,14 @@ def element_build_plan(graph: dict[str, Any], name: str) -> dict[str, Any]:
             for key in ("include", "exclude", "integrate")
             if key in config
         },
+        **(
+            {
+                "import": {
+                    "source": config.get("source", "/"),
+                    "target": config.get("target", "/"),
+                }
+            }
+            if kind == "import"
+            else {}
+        ),
     }

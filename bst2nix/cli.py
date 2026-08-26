@@ -46,6 +46,13 @@ def parser() -> argparse.ArgumentParser:
         help="immutable project revision; repeat for every project",
     )
     graph.add_argument(
+        "--project-url",
+        action="append",
+        default=[],
+        metavar="PROJECT=URL",
+        help="canonical repository URL; repeat for every project",
+    )
+    graph.add_argument(
         "--junction",
         action="append",
         default=[],
@@ -240,6 +247,7 @@ def main() -> None:
                 resolver,
                 args.element,
                 project_revisions=assignments(args.revision, "--revision"),
+                project_urls=assignments(args.project_url, "--project-url"),
             )
         elif args.command == "audit":
             from .translator import audit
