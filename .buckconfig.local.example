@@ -1,0 +1,8 @@
+# The checked-in configuration uses BuildBuddy Cloud and reads authentication
+# from BUILDBUDDY_API_KEY. Copy this file only to use another REAPI service.
+[buck2_re_client]
+action_cache_address = grpc://127.0.0.1:8980
+engine_address = grpc://127.0.0.1:8980
+cas_address = grpc://127.0.0.1:8980
+tls = false
+instance_name = main

@@ -1,0 +1,41 @@
+{
+  "elements": {
+    "hello.bst": {
+      "buildDependencies": [],
+      "commands": [
+        "mkdir -p %{install-root}/bin",
+        "printf '#!/bin/sh\\ncat \"$(dirname \"$0\")/../share/hello/message.txt\"\\n' > %{install-root}/bin/hello",
+        "chmod +x %{install-root}/bin/hello"
+      ],
+      "kind": "manual",
+      "runDependencies": [
+        "message.bst"
+      ],
+      "sources": [],
+      "variables": {
+        "greeting": "hello from bst2nix"
+      }
+    },
+    "message.bst": {
+      "buildDependencies": [],
+      "commands": [
+        "mkdir -p %{install-root}/share/hello",
+        "cp message.txt %{install-root}/share/hello/message.txt"
+      ],
+      "kind": "manual",
+      "runDependencies": [],
+      "sources": [
+        {
+          "directory": ".",
+          "path": "files"
+        }
+      ],
+      "variables": {
+        "greeting": "hello from bst2nix"
+      }
+    }
+  },
+  "formatVersion": 1,
+  "project": "hello",
+  "target": "hello.bst"
+}
