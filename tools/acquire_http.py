@@ -20,6 +20,19 @@ def safe_name(value):
     return path
 
 
+def safe_tar_member(member, _destination):
+    safe_name(member.name)
+    if member.isdev():
+        raise SystemExit("archive contains a device")
+    if member.islnk():
+        safe_name(member.linkname)
+    # Absolute symbolic links are valid package contents (for example,
+    # autotools INSTALL links into /usr/share). Extracting a symlink does not
+    # dereference its target, so retain it while still rejecting unsafe member
+    # and hard-link paths.
+    return member
+
+
 def download(url, attempts=7):
     for attempt in range(attempts):
         try:
@@ -35,11 +48,7 @@ def download(url, attempts=7):
 def extract(data, kind, destination, filename):
     if kind in {"tar", "archive"}:
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:*") as archive:
-            for member in archive.getmembers():
-                safe_name(member.name)
-                if member.isdev():
-                    raise SystemExit("archive contains a device")
-            archive.extractall(destination, filter="data")
+            archive.extractall(destination, filter=safe_tar_member)
     elif kind == "zip":
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             for member in archive.infolist():

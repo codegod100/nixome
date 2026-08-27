@@ -140,6 +140,7 @@ def lock_graph(
             ],
             "sources": normalized_sources,
             "variables": document.get("variables", {}),
+            "environment": document.get("environment", {}),
             "config": document.get("config", {}),
             "public": document.get("public", {}),
         }

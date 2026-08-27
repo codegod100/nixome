@@ -52,7 +52,5 @@ nix_build(
 
 artifact_alias(
     name = "gnomeos-oci",
-    # sha256("gnome:oci/gnomeos/image.bst"); generated element targets are
-    # content-addressed and public.
-    actual = "generated_elements//:element-268abdd057348d94937d622d4e47d9a2f08d3c68354d77851f810c737a8e9dd3",
+    actual = "generated_elements//:target",
 )

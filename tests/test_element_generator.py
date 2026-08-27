@@ -72,3 +72,4 @@ def test_renders_starlark_boolean_source_attributes():
     assert '"submodules": False' in result
     assert '"submodules": false' not in result
     assert '"directory": "4.4"' in result
+    assert '"sourceOrder": ["source"]' in result

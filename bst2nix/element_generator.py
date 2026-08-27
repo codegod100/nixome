@@ -119,6 +119,7 @@ def generate_buck_elements(
             f"    name = {_quote(_target(name))},",
             "    spec = " + _quote({
                 "plan": plans[name],
+                "sourceOrder": source_ids,
                 "sources": {source_id: sources[source_id] for source_id in source_ids},
             }) + ",",
             "    sources = {",

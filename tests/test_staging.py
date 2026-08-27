@@ -35,6 +35,22 @@ def test_stages_ordered_git_sources_in_declared_directories(tmp_path):
     assert (output / "subprojects/module/module.txt").read_bytes() == b"module\n"
 
 
+def test_strips_default_archive_root_directory(tmp_path):
+    source_id = "a" * 64
+    group = tmp_path / "materialized"
+    materialize(group, source_id, "package-1.0/configure")
+    source_lock = {
+        "elements": {"project:target.bst": [source_id]},
+        "sources": {source_id: {"fetcher": "tar"}},
+    }
+
+    output = tmp_path / "output"
+    stage_element_sources(source_lock, "project:target.bst", [group], output)
+
+    assert (output / "configure").read_bytes() == b"source\n"
+    assert not (output / "package-1.0").exists()
+
+
 def test_rejects_archive_path_traversal(tmp_path):
     source_id = "a" * 64
     group = tmp_path / "materialized"

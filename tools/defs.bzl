@@ -1,7 +1,8 @@
 def _python_tool_impl(ctx):
     args = cmd_args(
         "nix", "--extra-experimental-features", "nix-command flakes",
-        "shell", "nixpkgs#python3", "--command",
+        "shell", "nixpkgs#python3", "nixpkgs#openssl", "nixpkgs#gnupg",
+        "nixpkgs#bubblewrap", "nixpkgs#proot", "nixpkgs#patch", "--command",
         "env", "PYTHONPATH=.", "python3", ctx.attrs.src,
     )
     for dependency in ctx.attrs.srcs:

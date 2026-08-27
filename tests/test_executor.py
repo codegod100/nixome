@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 from bst2nix.executor import execute_plan
 
@@ -64,6 +65,59 @@ def test_maps_script_dependency_locations_without_chroot(tmp_path):
     execute_plan(plan, source, {"project:layer.bst": layer}, output)
 
     assert (output / "result").read_text() == "layer\n"
+
+
+def test_exposes_staged_dependency_tools_on_path(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    dependency = tmp_path / "dependency"
+    tool = dependency / "usr/bin/generated-tool"
+    tool.parent.mkdir(parents=True)
+    tool.write_text("#!/bin/sh\necho dependency-tool\n")
+    tool.chmod(0o755)
+    output = tmp_path / "output"
+    plan = {
+        "element": "project:uses-tool.bst",
+        "kind": "manual",
+        "variables": {},
+        "dependencies": [
+            {"element": "project:tools.bst", "scope": "build", "location": "/"}
+        ],
+        "commands": [
+            {
+                "phase": "build-commands",
+                "command": "generated-tool > %{install-root}/result",
+            }
+        ],
+    }
+
+    with patch("bst2nix.executor.shutil.which", return_value=None):
+        execute_plan(plan, source, {"project:tools.bst": dependency}, output)
+
+    assert (output / "result").read_text() == "dependency-tool\n"
+
+
+def test_compose_outputs_build_dependency_artifacts(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    dependency = tmp_path / "dependency"
+    dependency.mkdir()
+    (dependency / "composed").write_text("artifact\n")
+    output = tmp_path / "output"
+    plan = {
+        "element": "project:compose.bst",
+        "kind": "compose",
+        "variables": {},
+        "dependencies": [
+            {"element": "project:input.bst", "scope": "build", "location": "/"}
+        ],
+        "commands": [],
+        "compose": {},
+    }
+
+    execute_plan(plan, source, {"project:input.bst": dependency}, output)
+
+    assert (output / "composed").read_text() == "artifact\n"
 
 
 def test_executes_import_element(tmp_path):
@@ -165,6 +219,52 @@ def test_expands_nested_variables(tmp_path):
     execute_plan(plan, source, {}, output)
 
     assert (output / "usr/bin/result").is_file()
+
+
+def test_supplies_empty_optional_install_extension(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    output = tmp_path / "output"
+    plan = {
+        "element": "project:optional-install.bst",
+        "kind": "manual",
+        "variables": {},
+        "dependencies": [],
+        "commands": [
+            {
+                "phase": "install-commands",
+                "command": "touch %{install-root}/result\n%{install-extra}",
+            }
+        ],
+    }
+
+    execute_plan(plan, source, {}, output)
+
+    assert (output / "result").is_file()
+
+
+def test_autotools_uses_existing_configure_without_autoreconf(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    configure = source / "configure"
+    configure.write_text("#!/bin/sh\nexit 0\n")
+    configure.chmod(0o755)
+    output = tmp_path / "output"
+    plan = {
+        "element": "project:configured.bst",
+        "kind": "autotools",
+        "variables": {},
+        "dependencies": [],
+        "commands": [
+            {
+                "phase": "configure-commands",
+                "command": "%{autogen}",
+            }
+        ],
+    }
+
+    with patch("bst2nix.executor.shutil.which", return_value=None):
+        execute_plan(plan, source, {}, output)
 
 
 def test_expands_dependency_location(tmp_path):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -20,14 +21,30 @@ _VARIABLE = re.compile(r"%\{([^}]+)\}")
 def _merge(source: Path, destination: Path) -> None:
     if not source.is_dir():
         raise ExecutionError(f"artifact is not a directory: {source}")
-    destination.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(
-        source,
-        destination,
-        dirs_exist_ok=True,
-        symlinks=True,
-        copy_function=shutil.copy2,
-    )
+
+    def overlay(source_path: Path, destination_path: Path) -> None:
+        if source_path.is_symlink():
+            if destination_path.is_symlink() or destination_path.is_file():
+                destination_path.unlink()
+            elif destination_path.exists():
+                shutil.rmtree(destination_path)
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            destination_path.symlink_to(os.readlink(source_path))
+        elif source_path.is_dir():
+            if destination_path.is_symlink() or destination_path.is_file():
+                destination_path.unlink()
+            destination_path.mkdir(parents=True, exist_ok=True)
+            for child in source_path.iterdir():
+                overlay(child, destination_path / child.name)
+        else:
+            if destination_path.is_symlink() or destination_path.is_file():
+                destination_path.unlink()
+            elif destination_path.exists():
+                shutil.rmtree(destination_path)
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, destination_path)
+
+    overlay(source, destination)
 
 
 def _location(root: Path, location: str) -> Path:
@@ -91,24 +108,45 @@ def execute_plan(
                 '--destdir "%{install-root}"'
             )
         variables = {
-            "autogen": "autoreconf -fvi",
+            "autogen": (
+                "if [ -x ./configure ]; then :; "
+                "elif [ -x ./autogen.sh ]; then ./autogen.sh; "
+                "elif [ -x ./autogen ]; then ./autogen; "
+                "else autoreconf -fvi; fi"
+            ),
             "bindir": "/usr/bin",
+            "bootstrap_build_arch": "x86_64",
             "build-args": "--wheel --no-isolation",
+            "build-dir": "_build",
             "cargo-args": "--release --locked --offline",
+            "cmake-args": "",
             "command-subdir": ".",
             "conf-args": "",
             "datadir": "/usr/share",
             "dist-dir": "%{build-root}/dist",
+            "docdir": "/usr/share/doc",
+            "exec_prefix": "/usr",
+            "generator": "Ninja",
             "indep-libdir": "/usr/lib",
+            "includedir": "/usr/include",
+            "infodir": "/usr/share/info",
+            "install-extra": "",
             "libdir": "/usr/lib",
+            "libexecdir": "/usr/libexec",
             "make-args": "",
             "make": "make",
+            "make-install-args": "",
             "make-install": "make pure_install",
             "mandir": "/usr/share/man",
+            "max-jobs": "4",
             "perl-build": "./Build",
             "perl-build-install": "./Build install",
             "prefix": "/usr",
+            "element-name": element.split(":", 1)[-1],
+            "project-name": element.split(":", 1)[0] if ":" in element else "",
+            "sharedstatedir": "/var/lib",
             "sysconfdir": "/etc",
+            "target_arch": "x86_64",
             **plugin_variables,
             **{key: str(value) for key, value in plan.get("variables", {}).items()},
             "build-root": str(build_root),
@@ -142,10 +180,32 @@ def execute_plan(
         )
         environment = {
             **os.environ,
+            "PATH": os.pathsep.join([
+                str(sysroot / "cross/bin"),
+                str(sysroot / "usr/bin"),
+                str(sysroot / "bin"),
+                str(sysroot / "usr/sbin"),
+                str(sysroot / "sbin"),
+                os.environ.get("PATH", ""),
+            ]),
             "BST2NIX_BUILD_ROOT": str(build_root),
             "BST2NIX_INSTALL_ROOT": str(output),
             "BST2NIX_SYSROOT": str(sysroot),
         }
+        proot = shutil.which("proot")
+        bubblewrap = shutil.which("bwrap") if not proot else None
+        sandboxed = bool(proot or bubblewrap)
+        sandbox_variables = {
+            **variables,
+            "build-root": "/build",
+            "install-root": "/output",
+            "sysroot": "/",
+        }
+        element_environment = {
+            key: _expand(value, sandbox_variables, element)
+            for key, value in plan.get("environment", {}).items()
+        }
+        environment.update(element_environment)
         if plan.get("kind") == "import":
             import_config = plan["import"]
             source_name = _expand(import_config["source"], variables, element)
@@ -187,13 +247,61 @@ def execute_plan(
                 script_path.chmod(0o755)
 
         for entry in plan.get("commands", []):
-            command = _expand(entry["command"], variables, element)
-            for name in location_names:
-                command = command.replace(name, str(locations[name]))
+            command = _expand(
+                entry["command"],
+                sandbox_variables if sandboxed else variables,
+                element,
+            )
+            if sandboxed and element_environment:
+                exports = " ".join(
+                    f"{key}={shlex.quote(value)}"
+                    for key, value in sorted(element_environment.items())
+                )
+                command = f"export {exports}\n{command}"
+            if not sandboxed:
+                for name in location_names:
+                    command = command.replace(name, str(locations[name]))
+            argv = ["bash", "-euo", "pipefail", "-c", command]
+            cwd = build_root
+            command_environment = environment
+            if proot:
+                argv = [
+                    proot,
+                    "-R", str(sysroot),
+                    "-b", f"{build_root}:/build",
+                    "-b", f"{output}:/output",
+                    "-w", "/build",
+                    "/bin/bash", "-euo", "pipefail", "-c", command,
+                ]
+                cwd = None
+                command_environment = {
+                    **environment,
+                    "PATH": "/cross/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+                }
+            elif bubblewrap:
+                argv = [
+                    bubblewrap,
+                    "--die-with-parent",
+                    "--unshare-pid",
+                    "--unshare-ipc",
+                    "--unshare-uts",
+                    "--ro-bind", str(sysroot), "/",
+                    "--dev", "/dev",
+                    "--proc", "/proc",
+                    "--tmpfs", "/tmp",
+                    "--dir", "/build",
+                    "--dir", "/output",
+                    "--bind", str(build_root), "/build",
+                    "--bind", str(output), "/output",
+                    "--chdir", "/build",
+                    "--setenv", "PATH", "/cross/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+                    "/bin/bash", "-euo", "pipefail", "-c", command,
+                ]
+                cwd = None
             result = subprocess.run(
-                ["bash", "-euo", "pipefail", "-c", command],
-                cwd=build_root,
-                env=environment,
+                argv,
+                cwd=cwd,
+                env=command_environment,
             )
             if result.returncode:
                 raise ExecutionError(
@@ -207,7 +315,10 @@ def execute_plan(
             "collect_initial_scripts",
         }:
             for dependency in plan.get("dependencies", []):
-                if dependency.get("scope") in {"run", "all"}:
+                if (
+                    plan.get("kind") in {"compose", "filter"}
+                    or dependency.get("scope") in {"run", "all"}
+                ):
                     _merge(dependencies[dependency["element"]], output)
         else:
             for artifact in runtime:

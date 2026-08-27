@@ -51,7 +51,12 @@ def git_crate(crate, destination):
             ["git", "-C", str(repository), "checkout", "--detach", crate["commit"]],
             check=True,
         )
-        shutil.copytree(repository, destination, ignore=shutil.ignore_patterns(".git"))
+        shutil.copytree(
+            repository,
+            destination,
+            symlinks=True,
+            ignore=shutil.ignore_patterns(".git"),
+        )
     (destination / ".cargo-checksum.json").write_text(
         json.dumps({"files": {}, "package": None}, sort_keys=True)
     )

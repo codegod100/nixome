@@ -243,6 +243,7 @@ def main() -> None:
                     else {}
                 )
                 resolver.add(element, Path(checkout), imported_options)
+            resolver.compose_root()
             graph = lock_graph(
                 resolver,
                 args.element,

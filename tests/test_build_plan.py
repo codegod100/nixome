@@ -7,6 +7,7 @@ def test_preserves_script_commands_and_dependency_locations():
             "gnome:image.bst": {
                 "kind": "script",
                 "variables": {"go-arch": "amd64"},
+                "environment": {"CFLAGS": "%{build_flags}"},
                 "config": {"commands": ["build-oci --arch %{go-arch}"]},
                 "dependencyDetails": [
                     {
@@ -24,6 +25,7 @@ def test_preserves_script_commands_and_dependency_locations():
         "element": "gnome:image.bst",
         "kind": "script",
         "variables": {"go-arch": "amd64"},
+        "environment": {"CFLAGS": "%{build_flags}"},
         "dependencies": [
             {
                 "element": "gnome:filesystem.bst",

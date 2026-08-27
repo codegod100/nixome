@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import shutil
 import subprocess
 import tarfile
@@ -30,6 +31,42 @@ def _safe_members(archive: tarfile.TarFile, source_id: str):
             raise StagingError(f"source {source_id} archive contains an unsafe path")
         if member.isdev():
             raise StagingError(f"source {source_id} archive contains a device")
+        yield member
+
+
+def _archive_members(
+    archive: tarfile.TarFile,
+    source: dict[str, Any],
+    source_id: str,
+):
+    members = list(_safe_members(archive, source_id))
+    if source.get("fetcher") not in {"tar", "zip", "archive"}:
+        yield from members
+        return
+    base_pattern = source.get("base-dir", "*")
+    if base_pattern == "":
+        yield from members
+        return
+    roots = sorted({
+        PurePosixPath(member.name).parts[0]
+        for member in members
+        if PurePosixPath(member.name).parts
+    })
+    matches = [root for root in roots if fnmatch.fnmatchcase(root, str(base_pattern))]
+    if len(matches) != 1:
+        raise StagingError(
+            f"source {source_id} base-dir {base_pattern!r} matched "
+            f"{len(matches)} archive roots"
+        )
+    root = PurePosixPath(matches[0])
+    for member in members:
+        path = PurePosixPath(member.name)
+        if path == root:
+            continue
+        try:
+            member.name = str(path.relative_to(root))
+        except ValueError:
+            continue
         yield member
 
 
@@ -125,6 +162,6 @@ def stage_element_sources(
         with tarfile.open(archive_path, "r") as archive:
             archive.extractall(
                 destination,
-                members=_safe_members(archive, source_id),
+                members=_archive_members(archive, source, source_id),
                 filter="data",
             )

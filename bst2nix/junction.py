@@ -28,6 +28,8 @@ class Project:
     root: Path
     element_path: str
     options: dict[str, Any]
+    variables: dict[str, Any]
+    environment: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -56,20 +58,48 @@ def _raw_yaml(path: Path) -> dict[str, Any]:
     return value
 
 
-def load_project(root: Path, options: dict[str, Any]) -> Project:
+def load_project(
+    root: Path,
+    options: dict[str, Any],
+    *,
+    compose: bool = False,
+) -> Project:
     root = root.resolve()
-    config = _raw_yaml(root / "project.conf")
+    if compose:
+        try:
+            config = load_composed(
+                root / "project.conf",
+                project_root=root,
+                options=options,
+            )
+        except CompositionError as error:
+            raise JunctionError(str(error)) from error
+    else:
+        # The root project may include files through junctions which have not
+        # been registered yet. Junction projects are loaded compositionally
+        # below, once their checkout is available.
+        config = _raw_yaml(root / "project.conf")
+    if not isinstance(config, dict):
+        raise JunctionError(f"{root}/project.conf must contain a mapping")
     name = config.get("name")
     if not isinstance(name, str):
         raise JunctionError(f"{root}/project.conf has no project name")
     element_path = config.get("element-path", "elements")
     if not isinstance(element_path, str):
         raise JunctionError(f"{root}/project.conf has invalid element-path")
+    variables = config.get("variables", {})
+    environment = config.get("environment", {})
+    if not isinstance(variables, dict) or not isinstance(environment, dict):
+        raise JunctionError(
+            f"{root}/project.conf has invalid variables or environment"
+        )
     return Project(
         name=name,
         root=root,
         element_path=_safe_relative(element_path, "element-path"),
         options=dict(options),
+        variables=dict(variables),
+        environment=dict(environment),
     )
 
 
@@ -111,13 +141,41 @@ class JunctionResolver:
         ):
             raise JunctionError(f"{junction_element} has invalid overrides")
 
-        project = load_project(checkout, options)
+        project = load_project(checkout, options, compose=True)
         self._junctions[junction_element] = Junction(
             element=junction_element,
             project=project,
             overrides=dict(overrides),
             source_url=url,
             source_ref=ref,
+        )
+
+    def compose_root(self) -> None:
+        """Load root defaults after its external junction includes are resolvable."""
+        try:
+            config = load_composed(
+                self.root.root / "project.conf",
+                project_root=self.root.root,
+                options=self.root.options,
+                external_include=self.load_include,
+            )
+        except CompositionError as error:
+            raise JunctionError(str(error)) from error
+        if not isinstance(config, dict):
+            raise JunctionError(f"{self.root.root}/project.conf must contain a mapping")
+        variables = config.get("variables", {})
+        environment = config.get("environment", {})
+        if not isinstance(variables, dict) or not isinstance(environment, dict):
+            raise JunctionError(
+                f"{self.root.root}/project.conf has invalid variables or environment"
+            )
+        self.root = Project(
+            name=self.root.name,
+            root=self.root.root,
+            element_path=self.root.element_path,
+            options=self.root.options,
+            variables=dict(variables),
+            environment=dict(environment),
         )
 
     def resolve(self, owner: Project, dependency: str) -> ElementRef:
@@ -147,6 +205,14 @@ class JunctionResolver:
             raise JunctionError(str(error)) from error
         if not isinstance(value, dict):
             raise JunctionError(f"{reference.qualified()} is not a mapping")
+        value["variables"] = {
+            **project.variables,
+            **value.get("variables", {}),
+        }
+        value["environment"] = {
+            **project.environment,
+            **value.get("environment", {}),
+        }
         return value
 
     def load_include(self, reference: str) -> Any:

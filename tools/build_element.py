@@ -21,10 +21,11 @@ def main():
         materialized = Path(temporary) / "materialized"
         materialized.mkdir()
         for source_id, group in groups.items():
+            group = group.resolve()
             acquired = group / source_id if (group / source_id).is_dir() else group
             (materialized / source_id).symlink_to(acquired, target_is_directory=True)
         staged = Path(temporary) / "source"
-        source_ids = list(spec["sources"])
+        source_ids = spec.get("sourceOrder", list(spec["sources"]))
         stage_element_sources(
             {
                 "elements": {spec["plan"]["element"]: source_ids},

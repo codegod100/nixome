@@ -151,6 +151,12 @@ def element_build_plan(graph: dict[str, Any], name: str) -> dict[str, Any]:
         for key, value in variables.items()
     ):
         raise BuildPlanError(f"{name}: variables must contain scalar values")
+    environment = element.get("environment", {})
+    if not isinstance(environment, dict) or not all(
+        isinstance(key, str) and isinstance(value, (str, int, bool))
+        for key, value in environment.items()
+    ):
+        raise BuildPlanError(f"{name}: environment must contain scalar values")
     plan = {
         "formatVersion": 1,
         "element": name,
@@ -158,6 +164,9 @@ def element_build_plan(graph: dict[str, Any], name: str) -> dict[str, Any]:
         "variables": {
             key: "" if value is None else str(value)
             for key, value in sorted(variables.items())
+        },
+        "environment": {
+            key: str(value) for key, value in sorted(environment.items())
         },
         "dependencies": dependencies,
         "commands": commands,
